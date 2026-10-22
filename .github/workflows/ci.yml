@@ -15,6 +15,14 @@ jobs:
         with:
           required-ros-distributions: humble
 
+      - name: Install Nav2 & Gazebo dependencies (import-only, no sim)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ros-humble-nav2-bringup \
+            ros-humble-tf-transformations \
+            ros-humble-gazebo-ros-pkgs
+
       - name: Syntax-level lint (errors & undefined names only)
         run: |
           pip install flake8
