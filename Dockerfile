@@ -1,9 +1,16 @@
 # SUT 镜像: Gazebo(headless) + Nav2 + TurtleBot3 + 测试套件 一体化
+# 构建: docker build -t nav2-test-sut .
+# 运行: docker run --rm nav2-test-sut            (默认跑全量 pytest)
+#       docker run --rm nav2-test-sut bash -c "python3 -m pytest src/nav_test/test/test_nav_basic.py -v -s"
 FROM ros:humble
+
+# RUN 默认用 /bin/sh(dash), 无法解析 setup.bash 的 bash 语法
+SHELL ["/bin/bash", "-c"]
 
 ENV DEBIAN_FRONTEND=noninteractive \
     TURTLEBOT3_MODEL=burger
 
+# TurtleBot3 仿真直接用官方 apt 二进制包, 不再源码 clone + 编译
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-navigation2 \
       ros-humble-nav2-bringup \
@@ -13,13 +20,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-turtlebot3-gazebo \
       python3-colcon-common-extensions \
       python3-pytest \
-      git \
       procps \
     && rm -rf /var/lib/apt/lists/*
 
 # 测试包 (随仓库携带)
 COPY src/nav_test /opt/nav_ws/src/nav_test
-RUN cd /opt/nav_ws && . /opt/ros/humble/setup.bash && colcon build --symlink-install
+RUN source /opt/ros/humble/setup.bash && colcon build --symlink-install
 
 # Gazebo 在线模型离线内置 (ground_plane/sun), 避免运行时联网下载失败
 COPY docker/gazebo_models /root/.gazebo/models
