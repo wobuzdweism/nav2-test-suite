@@ -1,10 +1,18 @@
 # nav2_test_suite — ROS2 机器人导航系统测试套件
 
+[![CI](https://github.com/wobuzdweism/nav2-test-suite/actions/workflows/ci.yml/badge.svg)](https://github.com/wobuzdweism/nav2-test-suite/actions/workflows/ci.yml)
+
 针对 TurtleBot3 (burger) + Gazebo Classic + Nav2 + AMCL 仿真环境的系统性导航测试项目：
 45 条功能/安全/系统级测试用例设计执行，16 条 pytest 自动化用例全绿，定位 2 个真实缺陷，
-并集成 rosbag2 证据录制与离线指标复判。
+并集成 rosbag2 证据录制、GitHub Actions CI 与 Docker 环境固化。
 
 > 本仓库为纯测试侧工程：不修改被测系统（Nav2/TB3），只观测、判定、取证。
+
+```bash
+# 30 秒复现：构建镜像后一条命令跑完整套件（容器内自动拉起 Gazebo + Nav2）
+docker build -t nav2-test-sut .
+docker run --rm nav2-test-sut
+```
 
 ## 被测系统（SUT）
 
@@ -15,6 +23,7 @@
 | 导航栈 | Nav2（planner/controller/behavior/amcl/map_server，自定义参数） |
 | 机器人 | TurtleBot3 burger（差速底盘，单线激光） |
 | 测试框架 | pytest + rclpy（action client / topic / TF） |
+| 运行环境 | Docker 镜像（ros:humble 基线）或 VMware 虚拟机 |
 
 ## 测试设计
 
@@ -40,6 +49,30 @@ nav_test/bag_analyzer.py  离线分析：从 bag 的 /odom 计算位移幅值/�
                    弯曲度/峰值速度，写 analysis.json
 ```
 
+## 测试工程化
+
+**1. 证据链：录制与断言解耦**
+每条用例由 autouse fixture 自动录制 `/odom /amcl_pose /cmd_vel /tf /scan /plan`
+（`/scan` 发布端为 BEST_EFFORT，默认 RELIABLE 订阅收不到，需注入 QoS 覆盖）。
+断言指标从 bag 离线计算，不依赖 live 时序窗口，失败可回放复判。实际输出：
+
+```
+bag                              时长s   位移m   路径m   弯曲度  峰值v
+test_tc013_single_goal_reached    12.9   0.76   0.765   1.007   0.22
+test_tc018_cancel_stops_robot      4.7   0.441  0.476   1.081   0.225
+```
+
+**2. CI：GitHub Actions 分层设计**
+两个 job：`build-and-collect`（flake8 语法级 lint → colcon build → pytest --collect-only）
+与 `docker-build`（构建 SUT 镜像 → 容器内冒烟收集）。runner 无 GPU，
+CI 只验证"代码可编译、用例可发现、镜像可构建"，仿真用例本地/容器内执行。
+
+**3. 环境固化：Docker SUT 镜像**
+`ros:humble` + Nav2/Gazebo/TB3 官方二进制包 + 地图/参数/Gazebo 模型全部内置；
+entrypoint 复刻本地启动脚本的全部就绪检查（清残留 → 起 headless 仿真 → 发 initialpose
+→ 等 navigate_to_pose action → 等 AMCL 收敛），就绪后才执行 pytest。
+把"手工配置 + 快照回滚"的不可复现环境变成镜像可复现。
+
 ## 关键工程决策（踩坑实录）
 
 **1. 到达判定不用 AMCL 直读，用 odom 相对位移 + 非对称门限**
@@ -59,17 +92,6 @@ TC-014 向墙内发不可达目标，触发恢复行为使 AMCL 失去有效观�
 其后所有导航用例连锁失败——而它自身因"期望失败"反而判通过。
 用 A/B 实验坐实污染链后，将其移至套件末尾隔离。
 
-**4. rosbag2 证据链：录制与断言解耦**
-每条用例 autouse fixture 自动录制 /odom /amcl_pose /cmd_vel /tf /scan /plan
-（/scan 发布端为 BEST_EFFORT，需注入 QoS 覆盖）。指标从 bag 离线计算，
-不依赖 live 时序窗口，失败可回放复判。实际输出：
-
-```
-bag                              时长s   位移m   路径m   弯曲度  峰值v
-test_tc013_single_goal_reached    12.9   0.76   0.765   1.007   0.22
-test_tc018_cancel_stops_robot      4.7   0.441  0.476   1.081   0.225
-```
-
 ## 定位的两个真实缺陷
 
 | 编号 | 现象 | 根因 |
@@ -81,9 +103,27 @@ test_tc018_cancel_stops_robot      4.7   0.441  0.476   1.081   0.225
 
 仿真环境曾因虚拟机快照回滚发生五处丢失（hgfs 挂载/源码包/编译产物/
 Gazebo 在线模型缓存/地图文件），逐项定位并修复后全量重编译恢复 16 条全绿。
-修复过程沉淀为一键脚本（scripts/）与诊断命令清单，详见 commit 历史。
+修复过程沉淀为一键脚本（scripts/）、Docker 镜像与诊断命令清单，详见 commit 历史。
 
 ## 运行方式
+
+### 方式 A：Docker（推荐，零环境配置）
+
+```bash
+docker build -t nav2-test-sut .
+
+# 跑全量自动化用例（entrypoint 自动完成环境就绪检查）
+docker run --rm nav2-test-sut
+
+# 只跑某个模块
+docker run --rm nav2-test-sut bash -c \
+  "python3 -m pytest src/nav_test/test/test_nav_basic.py -v -s"
+
+# 把本轮 bag 证据挂出来，供离线复判
+docker run --rm -v $PWD/bags:/root/tb3_test_ws/bags nav2-test-sut
+```
+
+### 方式 B：VM 本地运行
 
 ```bash
 # 终端1：启动 Gazebo + Nav2，等待"环境就绪"
@@ -103,9 +143,12 @@ python3 src/nav_test/nav_test/bag_analyzer.py ~/tb3_test_ws/bags/run_<时间戳>
 ## 目录结构
 
 ```
-src/nav_test/          ROS2 Python 测试包（封装层 + 用例层 + 录包 fixture）
+src/nav_test/            ROS2 Python 测试包（封装层 + 用例层 + 录包 fixture + 离线分析）
 config/custom_nav2.yaml  被测 Nav2 参数（goal_checker/costmap/速度限制等）
-scripts/               环境启动与一键同步编译脚本
-docs/test_cases.xlsx   45 条用例设计表（步骤/判定/结果/根因备注）
-.github/workflows/     CI：编译检查 + 语法级 lint + 用例收集
+scripts/                 环境启动与一键同步编译脚本
+docs/test_cases.xlsx     45 条用例设计表（步骤/判定/结果/根因备注）
+Dockerfile               SUT 镜像定义（Gazebo headless + Nav2 + TB3 + 测试包）
+docker/entrypoint.sh     容器内环境就绪门卫（复刻 start_env.sh 全部检查）
+docker/gazebo_models/    离线内置模型（ground_plane/sun）
+.github/workflows/       CI：lint + 编译 + 用例收集 + 镜像构建冒烟
 ```
