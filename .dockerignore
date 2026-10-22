@@ -1,0 +1,13 @@
+# 缩小构建上下文: 与镜像无关的内容全部排除
+.git
+.github
+docs
+scripts
+bags
+build
+install
+log
+README.md
+**/__pycache__
+**/*.py[cod]
+docker/tb3_simulations/**/.git
