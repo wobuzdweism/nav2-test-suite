@@ -1,5 +1,5 @@
 name: CI
-[![CI](https://github.com/wobuzdweism/nav2-test-suite/actions/workflows/ci.yml/badge.svg)](https://github.com/wobuzdweism/nav2-test-suite/actions/workflows/ci.yml)
+
 on:
   push:
   pull_request:
@@ -37,3 +37,19 @@ jobs:
           source /opt/ros/humble/setup.bash
           source install/setup.bash
           python3 -m pytest src/nav_test/test --collect-only -q
+
+  docker-build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build SUT image (Gazebo headless + Nav2 + test suite)
+        run: docker build -t nav2-test-sut .
+
+      - name: Smoke test inside container (imports + collect, no sim start)
+        run: |
+          docker run --rm --entrypoint /bin/bash nav2-test-sut -c \
+            "source /opt/ros/humble/setup.bash && \
+             source /opt/tb3_ws/install/setup.bash && \
+             source /opt/nav_ws/install/setup.bash && \
+             python3 -m pytest src/nav_test/test --collect-only -q"
