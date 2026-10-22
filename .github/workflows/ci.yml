@@ -50,6 +50,5 @@ jobs:
         run: |
           docker run --rm --entrypoint /bin/bash nav2-test-sut -c \
             "source /opt/ros/humble/setup.bash && \
-             source /opt/tb3_ws/install/setup.bash && \
              source /opt/nav_ws/install/setup.bash && \
              python3 -m pytest src/nav_test/test --collect-only -q"
