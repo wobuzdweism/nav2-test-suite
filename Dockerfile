@@ -25,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # 测试包 (随仓库携带)
 COPY src/nav_test /opt/nav_ws/src/nav_test
-RUN source /opt/ros/humble/setup.bash && colcon build --symlink-install
+RUN cd /opt/nav_ws && source /opt/ros/humble/setup.bash && colcon build --symlink-install
 
 # Gazebo 在线模型离线内置 (ground_plane/sun), 避免运行时联网下载失败
 COPY docker/gazebo_models /root/.gazebo/models
