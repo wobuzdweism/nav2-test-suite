@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# ROS2 colcon 产物（永远重编译生成）
+build/
+install/
+log/
+
+# rosbag 录制产物
+bags/
+*.db3
+*.mcap
+
+# IDE
+.vscode/
+.idea/
