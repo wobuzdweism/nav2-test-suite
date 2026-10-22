@@ -1,5 +1,5 @@
 name: CI
-
+[![CI](https://github.com/wobuzdweism/nav2-test-suite/actions/workflows/ci.yml/badge.svg)](https://github.com/wobuzdweism/nav2-test-suite/actions/workflows/ci.yml)
 on:
   push:
   pull_request:
