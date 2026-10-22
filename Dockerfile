@@ -1,6 +1,4 @@
 # SUT 镜像: Gazebo(headless) + Nav2 + TurtleBot3 + 测试套件 一体化
-# 构建: docker build -t nav2-test-sut .
-# 运行: docker run --rm nav2-test-sut            (默认跑全量 pytest)
 FROM ros:humble
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -12,18 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ros-humble-gazebo-ros-pkgs \
       ros-humble-turtlebot3 \
       ros-humble-turtlebot3-msgs \
+      ros-humble-turtlebot3-gazebo \
       python3-colcon-common-extensions \
       python3-pytest \
       git \
       procps \
     && rm -rf /var/lib/apt/lists/*
-
-# TurtleBot3 仿真包 (构建时从官方 humble 分支拉取)
-RUN mkdir -p /opt/tb3_ws/src \
- && git clone --depth 1 -b humble \
-      https://github.com/ROBOTIS-Git/turtlebot3_simulations.git \
-      /opt/tb3_ws/src/turtlebot3_simulations \
- && cd /opt/tb3_ws && . /opt/ros/humble/setup.bash && colcon build --symlink-install
 
 # 测试包 (随仓库携带)
 COPY src/nav_test /opt/nav_ws/src/nav_test
