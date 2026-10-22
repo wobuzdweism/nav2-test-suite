@@ -14,7 +14,6 @@ sleep 3
 
 # 2. 环境
 source /opt/ros/humble/setup.bash
-source /opt/tb3_ws/install/setup.bash
 source /opt/nav_ws/install/setup.bash
 export TURTLEBOT3_MODEL=burger
 
