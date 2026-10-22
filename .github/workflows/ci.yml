@@ -18,7 +18,7 @@ jobs:
       - name: Syntax-level lint (errors & undefined names only)
         run: |
           pip install flake8
-          flake8 src/nav_test --count --select=E9,F63,F7,F82 --show-source --statistics
+          python3 -m flake8 src/nav_test --count --select=E9,F63,F7,F82 --show-source --statistics
 
       - name: Build package
         shell: bash
